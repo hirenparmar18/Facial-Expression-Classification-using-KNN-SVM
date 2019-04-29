@@ -1,0 +1,860 @@
+function varargout = main_gui(varargin)
+% MAIN_GUI MATLAB code for main_gui.fig
+%      MAIN_GUI, by itself, creates a new MAIN_GUI or raises the existing
+%      singleton*.
+%
+%      H = MAIN_GUI returns the handle to a new MAIN_GUI or the handle to
+%      the existing singleton*.
+%
+%      MAIN_GUI('CALLBACK',hObject,eventData,handles,...) calls the local
+%      function named CALLBACK in MAIN_GUI.M with the given input arguments.
+%
+%      MAIN_GUI('Property','Value',...) creates a new MAIN_GUI or raises the
+%      existing singleton*.  Starting from the left, property value pairs are
+%      applied to the GUI before main_gui_OpeningFcn gets called.  An
+%      unrecognized property name or invalid value makes property application
+%      stop.  All inputs are passed to main_gui_OpeningFcn via varargin.
+%
+%      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
+%      instance to run (singleton)".
+%
+% See also: GUIDE, GUIDATA, GUIHANDLES
+
+% Edit the above text to modify the response to help main_gui
+
+% Last Modified by GUIDE v2.5 24-May-2017 18:51:15
+
+% Begin initialization code - DO NOT EDIT
+gui_Singleton = 1;
+gui_State = struct('gui_Name',       mfilename, ...
+                   'gui_Singleton',  gui_Singleton, ...
+                   'gui_OpeningFcn', @main_gui_OpeningFcn, ...
+                   'gui_OutputFcn',  @main_gui_OutputFcn, ...
+                   'gui_LayoutFcn',  [] , ...
+                   'gui_Callback',   []);
+if nargin && ischar(varargin{1})
+    gui_State.gui_Callback = str2func(varargin{1});
+end
+
+if nargout
+    [varargout{1:nargout}] = gui_mainfcn(gui_State, varargin{:});
+else
+    gui_mainfcn(gui_State, varargin{:});
+end
+% End initialization code - DO NOT EDIT
+
+
+% --- Executes just before main_gui is made visible.
+function main_gui_OpeningFcn(hObject, eventdata, handles, varargin)
+% This function has no output args, see OutputFcn.
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% varargin   command line arguments to main_gui (see VARARGIN)
+
+% Choose default command line output for main_gui
+handles.output = hObject;
+
+% Update handles structure
+guidata(hObject, handles);
+
+% UIWAIT makes main_gui wait for user response (see UIRESUME)
+% uiwait(handles.figure1);
+
+
+% --- Outputs from this function are returned to the command line.
+function varargout = main_gui_OutputFcn(hObject, eventdata, handles) 
+% varargout  cell array for returning output args (see VARARGOUT);
+% hObject    handle to figure
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Get default command line output from handles structure
+varargout{1} = handles.output;
+
+
+% --- Executes on button press in pushbutton1.
+function pushbutton1_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global Im
+
+set(handles.text20,'String','')
+
+% Prompt user to select input image
+[fn, fp] = uigetfile('*.jpg;*.png;*.tiff;*.bmp;*.pgm','Please select input image');
+
+% Create imagepath
+impath = [fp fn];
+
+% Read image
+Im = imread(impath);
+
+% IF image is color then convert to gray
+% Gray image is 2D
+% Color image is 3D (R,G,B)
+if size(Im,3)==3
+    Im = rgb2gray(Im);
+end
+
+% Show image
+axes(handles.axes1)
+imshow(Im);
+title('Input image');
+
+% --- Executes on button press in pushbutton2.
+function pushbutton2_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global Im
+global In Ipca
+
+% Normalisation 1. Image resize to 100x100 2. Image values rescaling
+In = Normalise_image(Im);
+
+
+load PCA
+Ipca = In(:) - fbgAvgFace;
+
+% Reshape to visualise
+Ipca = reshape(Ipca,100,100);
+
+axes(handles.axes1)
+imshow(Ipca,[]);
+title('PCA image');
+
+% --- Executes on button press in pushbutton3.
+function pushbutton3_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton3 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global In
+expressionsres = {'HAPPY','SAD','SURPRISE','ANGER','DISGUST','FEAR','NEUTRAL'};
+colors = {'g','k','y','r','c','m','b'};
+
+axes(handles.axes1)
+imshow(In,[]);
+
+% IF KNN radio button is selected
+if get(handles.radiobutton3,'Value')==1
+    load KNN
+    % Substract average value
+    TestF = In(:) - fbgAvgFace;
+  
+    % Project faces into eigenspace by getting weights of each test face's
+    % representation as a linear combination of the eigenfaces.
+    testWeights = v'*TestF;
+
+    %% KNN prediction
+    out1 = predict(mdl,testWeights');  % --------------------------------- KNN recognition
+    
+    exp1 = expressionsres{out1};
+    set(handles.text20,'String',exp1,'ForeGroundColor',colors{out1})
+
+else
+    % Load SVM
+    load SVM
+    
+    % Substract average value
+    TestF = In(:) - fbgAvgFace;
+  
+    % Project faces into eigenspace by getting weights of each test face's
+    % representation as a linear combination of the eigenfaces.
+    testWeights = v'*TestF;
+
+    %% SVM prediction
+    out1 = predict(Mdl,testWeights');  % -------------------------------------- SVM recognition
+    
+    exp1 = expressionsres{out1};
+    set(handles.text20,'String',exp1,'ForeGroundColor',colors{out1})
+end
+
+function edit1_Callback(hObject, eventdata, handles)
+% hObject    handle to edit1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit1 as text
+%        str2double(get(hObject,'String')) returns contents of edit1 as a double
+
+v = str2double(get(hObject,'String')) ;
+if v<0.1 || v>1
+    errordlg('Please specify values between 0.1 to 1')
+    set(hObject,'String','0.1')
+end
+% --- Executes during object creation, after setting all properties.
+function edit1_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit1 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes when selected object is changed in uibuttongroup1.
+function uibuttongroup1_SelectionChangedFcn(hObject, eventdata, handles)
+% hObject    handle to the selected object in uibuttongroup1 
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+if get(handles.radiobutton1,'Value') == 1
+    set(handles.pushbutton4,'String','Train KNN')
+else
+    set(handles.pushbutton4,'String','Train SVM')
+end
+
+% --- Executes on button press in pushbutton4.
+function pushbutton4_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton4 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+if get(handles.radiobutton1,'Value') == 1
+    expressions = {'HA','SA','SU','AN','DI','FE','NE'};
+    expressionsres = {'HAPPY','SAD','SURPRISE','ANGER','DISGUST','FEAR','NEUTRAL'};
+    % Folder name
+    fname = 'jaffe';
+
+    % Get file info
+    D = dir([fname,'/*tiff']);
+ 
+    Features = [];
+
+    TrainLabels = [];
+    for ii = 1:length(D)
+
+        % Get file name
+        fn = D(ii).name;
+
+        % Create image path
+        impath = [fname '/' fn];
+
+        % Get the class of input image
+        cl1 = fn(4:5);
+
+        ix = find(strcmp(cl1,expressions));
+
+        % Read image
+        I = imread(impath);
+
+        
+        %% Normalise
+        I = double(I);
+
+        In = Normalise_image(I);
+
+        [nr,nc,nm] = size(In);
+        Features = [Features In(:)];
+
+        TrainLabels = [TrainLabels ix];
+
+%         imshow(In,[])
+%         title(fn);
+%         pause(0.00000000000001)
+
+    end
+
+    save Features Features TrainLabels
+    load Features
+    
+   
+    TR = str2double(get(handles.edit1,'String'));
+    
+    % Divide the database randomly in given percentage
+    [TrainF,TestF,TrainL,TestL] = divide_DB(Features,TrainLabels,TR);
+    
+    
+    for ii = 1:size(TrainF,2)
+        It = reshape(TrainF(:,ii),nr,nc,nm);
+        imshow(It,[])
+        title(['Train Image : ' num2str(ii)])
+        pause(0.00000000000001)
+    end
+     h1 = waitbar(0,'Please wait while training...');    
+    %% Training
+    % 1. Dimension reduction 10000 --> 30
+    % 2. Only Principle component extracted
+    [v, trainWeights ,fbgAvgFace]= PCA_generation(TrainF);
+    
+    %% KNN training
+    mdl = ClassificationKNN.fit(trainWeights',TrainL);  % ---------------------------- KNN training
+
+    
+    save KNN mdl v trainWeights fbgAvgFace
+    save PCA v trainWeights fbgAvgFace
+    close(h1)
+    msgbox(['KNN is trained and updated for training ratio = ' num2str(TR)])
+
+else
+        expressions = {'HA','SA','SU','AN','DI','FE','NE'};
+    expressionsres = {'HAPPY','SAD','SURPRISE','ANGER','DISGUST','FEAR','NEUTRAL'};
+    % Folder name
+    fname = 'jaffe';
+
+    % Get file info
+    D = dir([fname,'/*tiff']);
+
+
+    Features = [];
+
+    TrainLabels = [];
+    for ii = 1:length(D)
+
+        % Get file name
+        fn = D(ii).name;
+
+        % Create image path
+        impath = [fname '/' fn];
+
+        % Get the class of input image
+        cl1 = fn(4:5);
+
+        ix = find(strcmp(cl1,expressions));
+
+        % Read image
+        I = imread(impath);
+
+        %% Recognise
+        I = double(I);
+
+        In = Normalise_image(I);
+
+        [nr,nc,nm] = size(In);
+       Features = [Features In(:)];
+
+        TrainLabels = [TrainLabels ix];
+
+%         imshow(In,[])
+%         title(fn);
+%         pause(0.00000000000001)
+
+    end
+
+    save Features Features TrainLabels
+    
+    load Features
+    
+   
+    TR = str2double(get(handles.edit1,'String'));
+    
+    % Divide the database randomly in given percentage
+    [TrainF,TestF,TrainL,TestL] = divide_DB(Features,TrainLabels,TR);
+    
+    for ii = 1:size(TrainF,2)
+        It = reshape(TrainF(:,ii),nr,nc,nm);
+        imshow(It,[])
+        title(['Train Image : ' num2str(ii)])
+        pause(0.001)
+    end
+    %% Training
+     h1 = waitbar(0,'Please wait while training...');
+    [v, trainWeights ,fbgAvgFace]= PCA_generation(TrainF);
+
+
+
+    %% SVM training
+    Mdl = fitcecoc(trainWeights',TrainL);  % -------------------------- SVM training
+    
+    save SVM Mdl v trainWeights fbgAvgFace
+    close(h1)
+    msgbox(['SVM is trained and updated for training ratio = ' num2str(TR)])
+
+end
+% --- Executes on button press in pushbutton9.
+function pushbutton9_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton9 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+load resKNN
+load resSVM
+
+TR = 0.1:0.1:1;
+pause(0.5)
+% Plot results
+figure;
+plot(TR,res_mat1(:,1),'r*-','linewidth',2)
+hold on
+plot(TR,res_mat2(:,1),'gs-','linewidth',2)
+legend('KNN','SVM')
+xlabel('Training Ratio')
+ylabel('TP')
+title('True Positive')
+grid on
+pause(0.5)
+% Plot results
+figure;
+plot(TR,res_mat1(:,2),'r*-','linewidth',2)
+hold on
+plot(TR,res_mat2(:,2),'gs-','linewidth',2)
+legend('KNN','SVM')
+xlabel('Training Ratio')
+ylabel('TN')
+title('True Negative')
+grid on
+pause(0.5)
+% Plot results
+figure;
+plot(TR,res_mat1(:,3),'r*-','linewidth',2)
+hold on
+plot(TR,res_mat2(:,3),'gs-','linewidth',2)
+legend('KNN','SVM')
+xlabel('Training Ratio')
+ylabel('FP')
+title('False Positive')
+grid on
+pause(0.5)
+% Plot results
+figure;
+plot(TR,res_mat1(:,4),'r*-','linewidth',2)
+hold on
+plot(TR,res_mat2(:,4),'gs-','linewidth',2)
+legend('KNN','SVM')
+xlabel('Training Ratio')
+ylabel('FN')
+title('False Negative')
+grid on
+pause(0.5)
+% Plot results
+figure;
+plot(TR,res_mat1(:,5),'r*-','linewidth',2)
+hold on
+plot(TR,res_mat2(:,5),'gs-','linewidth',2)
+legend('KNN','SVM')
+xlabel('Training Ratio')
+ylabel('sensitivity')
+title('sensitivity')
+grid on
+pause(0.5)
+% Plot results
+figure;
+plot(TR,res_mat1(:,6),'r*-','linewidth',2)
+hold on
+plot(TR,res_mat2(:,6),'gs-','linewidth',2)
+legend('KNN','SVM')
+xlabel('Training Ratio')
+title('specificity')
+ylabel('specificity')
+grid on
+pause(0.5)
+% Plot results
+figure;
+plot(TR,res_mat1(:,7),'r*-','linewidth',2)
+hold on
+plot(TR,res_mat2(:,7),'gs-','linewidth',2)
+legend('KNN','SVM')
+xlabel('Training Ratio')
+title('precision')
+ylabel('precision')
+
+grid on
+pause(0.5)
+% Plot results
+figure;
+plot(TR,res_mat1(:,8),'r*-','linewidth',2)
+hold on
+plot(TR,res_mat2(:,8),'gs-','linewidth',2)
+legend('KNN','SVM')
+xlabel('Training Ratio')
+ylabel('F1_score')
+title('F1_score')
+grid on
+
+
+
+% --- Executes on button press in pushbutton7.
+function pushbutton7_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton7 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% Get features
+load Features
+
+% Result matrix
+res_mat1 = [];
+
+% No of iteration
+Niter  = 20;
+% Divide into training ratio
+for TR = 0.1:0.1:1
+    TR
+    
+    set(handles.edit1,'String',num2str(TR),'fontsize',12,'fontweight','bold','Foregroundcolor','r')
+    pause(0.0001)
+    tempres = [];
+    for kk = 1:Niter
+        set(handles.text21,'String',['TR: ' num2str(TR) ' - Iteration: ' num2str(kk)])
+    
+    
+    % Divide the database randomly in given percentage
+    [TrainF,TestF,TrainL,TestL] = divide_DB(Features,TrainLabels,TR);
+    
+    %% Training
+    
+    [v, trainWeights ,fbgAvgFace]= PCA_generation(TrainF);
+
+    mdl = ClassificationKNN.fit(trainWeights',TrainL);
+    %% Testing
+    
+    % Testing
+%     testim = zeros(
+    % Normalize testing images by removing training mean face
+    for i = 1:size(TestF,2)
+        TestF(:,i) = TestF(:,i) - fbgAvgFace;
+    end
+
+    % Project faces into eigenspace by getting weights of each test face's
+    % representation as a linear combination of the eigenfaces.
+    testWeights = v'*TestF;
+
+    %% KNN prediction
+    out = predict(mdl,testWeights');
+    
+    
+    %% Calculate Accuracy
+    [TP,TN,FP,FN,sensitivity,specificity,precision,F1_score] = calculate_results(TestL,out);
+    tempres = [tempres ; TP,TN,FP,FN,sensitivity,specificity,precision,F1_score];
+    
+      CM = confusionmat(TestL(:),out(:));
+    set(handles.uitable1,'Data',CM);
+    set(handles.text5,'String',num2str(TP));
+    set(handles.text7,'String',num2str(TN));
+    set(handles.text9,'String',num2str(FP));
+    set(handles.text11,'String',num2str(FN));
+    set(handles.text13,'String',num2str(sensitivity));
+    set(handles.text15,'String',num2str(specificity));
+    set(handles.text17,'String',num2str(precision));
+    set(handles.text19,'String',num2str(F1_score));
+    pause(0.001)
+    end
+    % Store the result
+    res_mat1 = [res_mat1 ;mean(tempres)];
+end
+
+TR = 0.1:0.1:1;
+
+% Plot results
+figure;
+plot(TR,res_mat1(:,1),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('KNN')
+ylabel('TP')
+title('True Positive')
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat1(:,2),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('KNN')
+ylabel('TN')
+title('True Negative')
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat1(:,3),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('KNN')
+ylabel('FP')
+title('False Positive')
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat1(:,4),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('KNN')
+ylabel('FN')
+title('False Negative')
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat1(:,5),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('KNN')
+ylabel('sensitivity')
+title('sensitivity')
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat1(:,6),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('KNN')
+title('specificity')
+ylabel('specificity')
+
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat1(:,1),'r-','linewidth',2)
+xlabel('Training Ratio')
+title('precision')
+ylabel('precision')
+legend('KNN')
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat1(:,1),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('KNN')
+ylabel('F1_score')
+title('F1_score')
+grid on
+
+save resKNN res_mat1
+% --- Executes on button press in pushbutton8.
+function pushbutton8_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton8 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Get features
+load Features
+
+% Result matrix
+res_mat2 = [];
+
+% No of iteration
+Niter  = 5;
+
+
+% Divide into training ratio
+for TR = 0.1:0.1:1
+    TR
+    set(handles.edit1,'String',num2str(TR),'fontsize',12,'fontweight','bold','Foregroundcolor','r')
+    pause(0.0001)
+    tempres = [];
+    for kk = 1:Niter
+        set(handles.text21,'String',['TR: ' num2str(TR) ' - Iteration: ' num2str(kk)])
+    
+    % Divide the database randomly in given percentage
+    [TrainF,TestF,TrainL,TestL] = divide_DB(Features,TrainLabels,TR);
+    
+    %% Training
+    
+    [v, trainWeights ,fbgAvgFace]= PCA_generation(TrainF);
+
+    Mdl = fitcecoc(trainWeights',TrainL);
+    %% Testing
+    
+    % Testing
+%     testim = zeros(
+    % Normalize testing images by removing training mean face
+    for i = 1:size(TestF,2)
+        TestF(:,i) = TestF(:,i) - fbgAvgFace;
+    end
+
+    % Project faces into eigenspace by getting weights of each test face's
+    % representation as a linear combination of the eigenfaces.
+    testWeights = v'*TestF;
+
+    %% SVM prediction
+    out = predict(Mdl,testWeights');
+    
+    
+    %% Calculate Accuracy
+    [TP,TN,FP,FN,sensitivity,specificity,precision,F1_score] = calculate_results(TestL,out);
+    tempres = [tempres ; TP,TN,FP,FN,sensitivity,specificity,precision,F1_score];
+    CM = confusionmat(TestL(:),out(:));
+    set(handles.uitable1,'Data',CM);
+    set(handles.text5,'String',num2str(TP));
+    set(handles.text7,'String',num2str(TN));
+    set(handles.text9,'String',num2str(FP));
+    set(handles.text11,'String',num2str(FN));
+    set(handles.text13,'String',num2str(sensitivity));
+    set(handles.text15,'String',num2str(specificity));
+    set(handles.text17,'String',num2str(precision));
+    set(handles.text19,'String',num2str(F1_score));
+    pause(0.001)
+
+    end
+    % Store the result
+    res_mat2 = [res_mat2 ;mean(tempres)];
+end
+
+TR = 0.1:0.1:1;
+
+% Plot results
+figure;
+plot(TR,res_mat2(:,1),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('SVM')
+ylabel('TP')
+title('True Positive')
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat2(:,2),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('SVM')
+ylabel('TN')
+title('True Negative')
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat2(:,3),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('SVM')
+ylabel('FP')
+title('False Positive')
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat2(:,4),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('SVM')
+ylabel('FN')
+title('False Negative')
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat2(:,5),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('SVM')
+ylabel('sensitivity')
+title('sensitivity')
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat2(:,6),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('SVM')
+title('specificity')
+ylabel('specificity')
+
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat2(:,1),'r-','linewidth',2)
+xlabel('Training Ratio')
+title('precision')
+ylabel('precision')
+legend('SVM')
+grid on
+
+% Plot results
+figure;
+plot(TR,res_mat2(:,1),'r-','linewidth',2)
+xlabel('Training Ratio')
+legend('SVM')
+ylabel('F1_score')
+title('F1_score')
+grid on
+
+save resSVM res_mat2
+
+
+% --- Executes on button press in pushbutton5.
+function pushbutton5_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton5 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+load KNN
+
+load Features
+TestF = Features;
+TestL = TrainLabels;
+
+% Testing
+%     testim = zeros(
+% Normalize testing images by removing training mean face
+for i = 1:size(TestF,2)
+    TestF(:,i) = TestF(:,i) - fbgAvgFace;
+end
+
+% Project faces into eigenspace by getting weights of each test face's
+% representation as a linear combination of the eigenfaces.
+testWeights = v'*TestF;
+
+%% KNN prediction
+out = predict(mdl,testWeights');
+
+
+CM = confusionmat(TestL(:),out(:));
+set(handles.uitable1,'Data',CM);
+
+%% Calculate Accuracy
+[TP,TN,FP,FN,sensitivity,specificity,precision,F1_score] = calculate_results(TestL,out);
+
+set(handles.text5,'String',num2str(TP));
+set(handles.text7,'String',num2str(TN));
+set(handles.text9,'String',num2str(FP));
+set(handles.text11,'String',num2str(FN));
+set(handles.text13,'String',num2str(sensitivity));
+set(handles.text15,'String',num2str(specificity));
+set(handles.text17,'String',num2str(precision));
+set(handles.text19,'String',num2str(F1_score));
+
+
+
+% --- Executes on button press in pushbutton6.
+function pushbutton6_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton6 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+load SVM
+
+load Features
+TestF = Features;
+TestL = TrainLabels;
+
+% Testing
+%     testim = zeros(
+% Normalize testing images by removing training mean face
+for i = 1:size(TestF,2)
+    TestF(:,i) = TestF(:,i) - fbgAvgFace;
+end
+
+% Project faces into eigenspace by getting weights of each test face's
+% representation as a linear combination of the eigenfaces.
+testWeights = v'*TestF;
+
+%% KNN prediction
+out = predict(Mdl,testWeights');
+
+%% Calculate Accuracy
+[TP,TN,FP,FN,sensitivity,specificity,precision,F1_score] = calculate_results(TestL,out);
+
+CM = confusionmat(TestL(:),out(:));
+set(handles.uitable1,'Data',CM);
+set(handles.text5,'String',num2str(TP));
+set(handles.text7,'String',num2str(TN));
+set(handles.text9,'String',num2str(FP));
+set(handles.text11,'String',num2str(FN));
+set(handles.text13,'String',num2str(sensitivity));
+set(handles.text15,'String',num2str(specificity));
+set(handles.text17,'String',num2str(precision));
+set(handles.text19,'String',num2str(F1_score));
+
+
+% --- Executes on button press in pushbutton10.
+function pushbutton10_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton10 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+close(handles.figure1)
+
+
+% --- Executes on button press in pushbutton11.
+function pushbutton11_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton11 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+add_new_im
